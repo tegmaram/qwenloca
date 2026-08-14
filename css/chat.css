@@ -1,0 +1,200 @@
+/* ============================================================
+   QwenLoca — chat screen styles
+   ============================================================ */
+
+.chat-root {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.chat-scroll {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 10px 2px 14px;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.msg {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.msg .avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-size: 15px;
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.msg.user { flex-direction: row-reverse; }
+
+.msg.user .avatar { background: var(--accent-grad); color: #fff; }
+.msg.bot .avatar { background: var(--bg-elev); border: 1px solid var(--border); }
+
+.msg .bubble {
+  max-width: min(86%, 640px);
+  padding: 11px 14px;
+  border-radius: 14px;
+  font-size: 14.5px;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.msg.user .bubble {
+  background: linear-gradient(135deg, rgba(124, 108, 255, 0.85), rgba(99, 102, 241, 0.85));
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.msg.bot .bubble {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-bottom-left-radius: 4px;
+}
+
+.msg.bot .bubble.streaming::after {
+  content: "▍";
+  color: var(--accent-2);
+  animation: blink 1s steps(2) infinite;
+  margin-left: 2px;
+}
+
+@keyframes blink { 50% { opacity: 0; } }
+
+/* markdown-lite inside bubbles */
+.bubble p { margin: 0 0 8px; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble h1, .bubble h2, .bubble h3 { font-size: 15px; margin: 10px 0 6px; }
+.bubble pre {
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  margin: 8px 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.bubble code {
+  font-family: var(--mono);
+  font-size: 0.9em;
+  background: rgba(148, 163, 255, 0.14);
+  padding: 1px 5px;
+  border-radius: 6px;
+}
+.bubble pre code { background: none; padding: 0; }
+.bubble ul, .bubble ol { margin: 6px 0; padding-left: 20px; }
+.bubble blockquote {
+  margin: 8px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent);
+  color: var(--text-dim);
+}
+.bubble a { color: var(--accent-2); }
+
+/* collapsible "thinking" block */
+.think {
+  margin: 8px 0;
+  border: 1px dashed rgba(148, 163, 255, 0.35);
+  border-radius: 10px;
+  background: rgba(148, 163, 255, 0.06);
+  overflow: hidden;
+}
+
+.think summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--accent-2);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.think .think-body {
+  padding: 2px 12px 10px;
+  color: var(--text-dim);
+  font-size: 13px;
+  border-top: 1px dashed rgba(148, 163, 255, 0.2);
+}
+
+/* system/status message */
+.msg.system { justify-content: center; }
+.msg.system .bubble {
+  background: transparent;
+  border: none;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  text-align: center;
+  max-width: 90%;
+}
+
+/* composer */
+.composer-wrap {
+  flex: 0 0 auto;
+  padding: 8px 2px max(10px, env(safe-area-inset-bottom));
+  background: linear-gradient(to top, var(--bg) 75%, transparent);
+}
+
+.composer-inner {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  padding: 8px 8px 8px 14px;
+  max-width: 760px;
+  margin: 0 auto;
+  box-shadow: var(--shadow);
+}
+
+.composer-inner:focus-within { border-color: rgba(124, 108, 255, 0.7); }
+
+#composer {
+  flex: 1 1 auto;
+  resize: none;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.45;
+  max-height: 160px;
+  padding: 8px 2px;
+  min-width: 0;
+}
+
+#composer::placeholder { color: var(--text-faint); }
+
+.composer-hint {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-faint);
+  margin-top: 7px;
+}
+
+/* welcome message cards */
+.welcome-msg { width: 100%; }
+.welcome-msg .bubble { max-width: 100%; background: var(--bg-card); border: 1px solid var(--border); }
+.welcome-msg .bubble h3 { margin: 0 0 6px; font-size: 16px; }
