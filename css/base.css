@@ -282,6 +282,35 @@ a { color: var(--accent-2); }
 
 .sum-list li { margin: 2px 0; word-break: break-all; }
 
+/* technical error details (collapsible) */
+.err-details {
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-soft);
+  padding: 8px 12px;
+}
+
+.err-details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-faint);
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.err-details pre {
+  margin: 8px 0 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
 /* ---------- toasts ---------- */
 
 .toast-root {

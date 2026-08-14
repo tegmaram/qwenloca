@@ -25,6 +25,10 @@ export function missingFiles(store, variantKey) {
 /**
  * Detect the dtype from the selected decoder model file name.
  * Returns { dtype, label, warn } or null if no decoder file was selected.
+ *
+ * `warn` may be:
+ *   - "mix:<decoderDtype>:<embedDtype>" — files from two different variants
+ *   - a human-readable warning for heavy variants (fp32/q8)
  */
 export function detectVariant(store) {
   const decoder = store.list.find((f) => /^decoder_model_merged.*\.onnx$/i.test(f.name));
@@ -32,16 +36,40 @@ export function detectVariant(store) {
   const m = /^decoder_model_merged(.*)\.onnx$/i.exec(decoder.name);
   const suffix = (m ? m[1] : '').toLowerCase();
   const dtype = SUFFIX_TO_DTYPE[suffix];
+
+  // Check the embeddings file matches the same variant.
+  const embed = store.list.find((f) => /^embed_tokens.*\.onnx$/i.test(f.name));
+  let embedDtype = null;
+  if (embed) {
+    const em = /^embed_tokens(.*)\.onnx$/i.exec(embed.name);
+    embedDtype = SUFFIX_TO_DTYPE[(em ? em[1] : '').toLowerCase()] ?? null;
+  }
+
   if (!dtype) return { dtype: null, label: `"${decoder.name}"`, warn: `Unknown model file variant "${decoder.name}".` };
 
-  const warn =
-    dtype === 'fp32'
-      ? 'You selected the full-precision (fp32) model — it is about 9.5 GB and will very likely crash phones. The 4-bit variant is recommended.'
-      : dtype === 'q8'
-        ? 'You selected the int8 (quantized) model (~2.2 GB). It works, but the 4-bit variant is faster and smaller.'
-        : null;
+  let warn = null;
+  if (embedDtype && embedDtype !== dtype) {
+    warn = `mix:${dtype}:${embedDtype}`;
+  } else if (dtype === 'fp32') {
+    warn =
+      'You selected the full-precision (fp32) model — it is about 9.5 GB and will very likely crash phones. The 4-bit variant is recommended.';
+  } else if (dtype === 'q8') {
+    warn =
+      'You selected the int8 (quantized) model (~2.2 GB). It works, but the 4-bit variant is faster and smaller.';
+  }
 
   return { dtype, label: dtype, warn };
+}
+
+/** Human-readable "mix" explanation. */
+export function mixExplanation(warn) {
+  if (typeof warn !== 'string' || !warn.startsWith('mix:')) return null;
+  const [, decoder, embed] = warn.split(':');
+  return (
+    `Your selection mixes two variants: the <strong>decoder</strong> is <code>${decoder}</code> but the ` +
+    `<strong>embeddings</strong> are <code>${embed}</code>. All files must come from the <em>same</em> variant. ` +
+    'Tap <strong>“Pick files again”</strong> and select only the files of one variant (preferably q4f16).'
+  );
 }
 
 /** Total size of the selected files the engine will need (approx). */

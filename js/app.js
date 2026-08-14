@@ -16,7 +16,7 @@ import {
   showWelcome, showAskFiles, showDownload, showLoading, showPickPrompt,
   showLoadError, confirmRedownload, toastError,
 } from './wizard.js';
-import { detectVariant, missingFiles, requiredNames } from './model-files.js';
+import { detectVariant, missingFiles, requiredNames, mixExplanation } from './model-files.js';
 import { confirmDialog, toast, el, openModal } from './ui.js';
 
 const wizardRoot = document.getElementById('wizard-root');
@@ -182,6 +182,36 @@ function handleFilesSelected(fileList) {
   addMode = false;
 
   const variant = detectVariant(store);
+
+  // Mixed variants (decoder from one, embeddings from another) — very common
+  // on Android when the Downloads folder holds several download attempts.
+  if (variant && variant.warn && typeof variant.warn === 'string' && variant.warn.startsWith('mix:')) {
+    showLoadError({
+      message: mixExplanation(variant.warn),
+      found: requiredNames(CONFIG.defaultVariant).filter((n) => store.has(n)),
+      missing: missingFiles(store, CONFIG.defaultVariant),
+      onRetry: () => openFilePicker('replace'),
+      onDownload: () => startDownloadFlow(),
+      onBack: () => boot(),
+    });
+    return;
+  }
+
+  // Variant we don't support (fp32 / fp16 / q8 ...) — loading it would likely
+  // crash the phone, so tell the user to get the 4-bit variant instead.
+  if (variant && !Object.values(CONFIG.variants).some((v) => v.dtype === variant.dtype)) {
+    showLoadError({
+      message:
+        `You selected the <strong>${variant.label}</strong> variant, which this app doesn’t support on phones. ` +
+        (variant.warn ? `${variant.warn} ` : '') +
+        'Please download the recommended 4-bit (q4f16) variant and select those files instead.',
+      onRetry: () => openFilePicker('replace'),
+      onDownload: () => startDownloadFlow(),
+      onBack: () => boot(),
+    });
+    return;
+  }
+
   if (!variant) {
     const missing = missingFiles(store, CONFIG.defaultVariant);
     showLoadError({
@@ -250,19 +280,49 @@ async function loadModel(files, dtype) {
     chat = new ChatUI(engine);
     showChatScreen();
   } catch (err) {
-    console.error(err);
+    console.error('QwenLoca model load failed:', err);
     disposeEngine();
-    const msg =
-      err?.message?.includes('not found') || err?.message?.includes('404')
-        ? `Some model files couldn’t be read. Make sure you selected the right files (they must match the variant you downloaded).`
-        : `The model couldn’t start: ${err?.message || err}`;
+
+    // Figure out exactly which file was missing (transformers.js puts the
+    // failing qwen:// URL inside the error message).
+    const failing = extractFailingFile(err);
+    const variantKey = Object.keys(CONFIG.variants).find((k) => CONFIG.variants[k].dtype === dtype);
+    const vKey = variantKey || currentVariant;
+    const missing = failing ? [failing] : missingFiles(store, vKey);
+
+    let message;
+    if (missing.length > 0) {
+      const names = missing.map((n) => `<code>${escHtml(n)}</code>`).join(', ');
+      message =
+        `Almost there — ${missing.length === 1 ? '1 file is' : `${missing.length} files are`} still missing from your selection: ${names}. ` +
+        'Tap <strong>“Select these files”</strong> to add them (your current selection is kept).';
+    } else {
+      message = `The model couldn’t start: ${escHtml(err?.message || err)}`;
+    }
+    message += '<br><br><span class="small muted">Tip: 4-bit (q4f16) is the recommended variant for phones.</span>';
+
     showLoadError({
-      message: `${msg}<br><br><span class="small muted">Tip: 4-bit (q4f16) is the recommended variant for phones.</span>`,
+      message,
+      found: requiredNames(vKey).filter((n) => store.has(n)),
+      missing,
+      onSelectMissing: missing.length ? () => openFilePicker('add') : null,
       onRetry: () => openFilePicker('replace'),
       onDownload: () => startDownloadFlow(),
       onBack: () => boot(),
+      details: err?.message || String(err),
     });
   }
+}
+
+/** Pull the failing model-file name out of a transformers.js error message. */
+function extractFailingFile(err) {
+  if (!err || typeof err.message !== 'string') return null;
+  const m = err.message.match(/qwen:\/\/[^/\s]+(?:\/[^/\s"']+)*\/([^/\s"']+)/);
+  return m ? decodeURIComponent(m[1]) : null;
+}
+
+function escHtml(s) {
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 // ---------------------------------------------------------------- events

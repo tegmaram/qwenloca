@@ -67,6 +67,7 @@ export function makeFetcher(store, modelUrl) {
           },
         });
       }
+      console.warn(`[QwenLoca] selection is missing file: "${base}" (requested via ${u})`);
       return new Response(`Model file not found in your selection: ${base}`, { status: 404 });
     }
     if (realFetch) return realFetch(u, init);

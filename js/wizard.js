@@ -113,11 +113,19 @@ export function showPickPrompt({ onPick, onDownload, message }) {
  * @param {string[]} [opts.found]  files already in the selection
  * @param {string[]} [opts.missing] files still needed
  * @param {Function} [opts.onSelectMissing] picks ONLY the missing files (add mode)
+ * @param {string} [opts.details] raw technical error message (collapsible)
  */
-export function showLoadError({ message, onRetry, onDownload, onBack, onSelectMissing = null, found = [], missing = [] }) {
+export function showLoadError({ message, onRetry, onDownload, onBack, onSelectMissing = null, found = [], missing = [], details = null }) {
   clear(root());
 
   const body = [el('p', { html: message })];
+
+  if (details) {
+    body.push(el('details', { class: 'err-details' }, [
+      el('summary', { text: 'Technical details' }),
+      el('pre', { text: details }),
+    ]));
+  }
 
   if (found.length || missing.length) {
     const summary = el('div', { class: 'selection-summary' }, []);
