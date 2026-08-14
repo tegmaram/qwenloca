@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b0f1a" />
   <meta name="description" content="QwenLoca — Qwen3.5-2B (ONNX) chat that runs 100% in your browser via WebAssembly. Download the model files once, select them locally, chat privately. Works on Android Chrome." />
   <title>QwenLoca · Qwen3.5-2B in your browser</title>
-  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/svg+xml" href="icons/icon.svg" />
   <link rel="apple-touch-icon" href="icons/icon-192.png" />
   <link rel="stylesheet" href="css/base.css" />
@@ -60,6 +60,29 @@
   </div>
 
   <input type="file" id="file-picker" multiple hidden accept=".onnx,.json,.txt" />
+
+  <script>
+    /* Cross-origin isolation for static hosts that can't set COOP/COEP headers
+       (e.g. GitHub Pages): register sw.js, then reload once so the document is
+       served with the headers and ONNX Runtime can use threaded WASM.
+       When the host already sends the headers (server.js), nothing happens. */
+    if ('serviceWorker' in navigator && typeof crossOriginIsolated !== 'undefined' && !crossOriginIsolated) {
+      window.addEventListener('load', () => {
+        const reloadIfNeeded = () => {
+          if (!crossOriginIsolated) location.reload();
+        };
+        navigator.serviceWorker
+          .register('sw.js')
+          .then(() => {
+            if (navigator.serviceWorker.controller) reloadIfNeeded();
+            else {
+              navigator.serviceWorker.addEventListener('controllerchange', reloadIfNeeded, { once: true });
+            }
+          })
+          .catch(() => { /* SW unavailable — app still works single-threaded */ });
+      });
+    }
+  </script>
 
   <script type="module" src="js/app.js"></script>
 </body>

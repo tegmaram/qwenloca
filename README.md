@@ -45,6 +45,26 @@ headers the app still works (single-threaded fallback).
 > ⚠️ The app uses ES modules, so it must be served over HTTP(S) — opening
 > `index.html` directly from the file system won’t work in Chrome.
 
+## Host on GitHub Pages
+
+Yes — the site is fully static, so GitHub Pages works with no build step:
+
+1. Push the code to GitHub (already done: branch `arena/019ffdaf-qwenloca`).
+2. Repo **Settings → Pages → Source: “Deploy from a branch”** →
+   select `arena/019ffdaf-qwenloca` (or `main` if you merge it) → `/ (root)` → Save.
+3. Done. Your app will be at `https://<user>.github.io/qwenloca/`.
+
+**About multithreading:** GitHub Pages can’t send COOP/COEP headers, so the app
+registers `sw.js` on first load — a tiny service worker that re-serves the
+navigation response with those headers (a standard trick for static hosts). It
+reloads the page once, and from then on ONNX Runtime uses the threaded WASM
+build. The service worker caches nothing — model files are still never stored.
+If service workers are unavailable, the app simply runs single-threaded.
+
+All asset paths, the PWA manifest (`manifest.json` with `./`-relative
+`start_url`/`scope`) and the model download links are relative or absolute
+external URLs, so subpath hosting (project pages) works without changes.
+
 ## Android tips
 
 - Use **Chrome** (recent version — it supports WebAssembly + ES modules).
@@ -74,7 +94,8 @@ js/
   chat.js                 chat UI, markdown-lite, <think> blocks, settings
   ui.js                   DOM helpers, modals, toasts
 server.js                 zero-dep static server (COOP/COEP)
-manifest.webmanifest      PWA manifest for Android home screen
+sw.js                     COI service worker (for GitHub Pages etc.)
+manifest.json             PWA manifest for Android home screen
 icons/                    app icons (SVG + PNG)
 ```
 
