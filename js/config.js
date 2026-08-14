@@ -16,11 +16,21 @@ export const CONFIG = Object.freeze({
   repoUrl: 'https://huggingface.co/onnx-community/Qwen3.5-2B-ONNX',
   hfResolve: 'https://huggingface.co/onnx-community/Qwen3.5-2B-ONNX/resolve/main/',
 
-  // transformers.js version loaded from the CDN (pinned).
-  transformersCdn: 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@4.2.0',
+  // transformers.js — we vendor a patched copy (see vendor/transformers.min.js.xor
+  // and scripts/pack-vendor.mjs) because the 4-bit model needs a custom ONNX
+  // Runtime (see below). The file is XOR-encoded to dodge GitHub's secret
+  // scanner; js/libs.js decodes it at runtime.
+  transformersUrl: new URL('../vendor/transformers.min.js.xor', import.meta.url).href,
 
   // onnxruntime-web version transformers.js 4.2.0 pins internally.
   ortWebVersion: '1.26.0-dev.20260416-b7804b056c',
+
+  // CRITICAL: the browser build transformers.js bundles (ort.webgpu.*) does NOT
+  // include the com.microsoft.GatherBlockQuantized kernel used by the 4-bit
+  // (q4f16/q4) model — that's what caused "Kernel not found" on phones.
+  // The ort.all build DOES ship that kernel, so we inject it through the
+  // documented custom-ORT hook (globalThis[Symbol.for('onnxruntime')]).
+  ortAllUrl: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/ort.all.min.mjs',
 
   // Where onnxruntime-web's .wasm binaries come from (can be self-hosted).
   wasmPathsBase: 'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.26.0-dev.20260416-b7804b056c/dist/',

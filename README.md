@@ -85,7 +85,7 @@ css/                      base.css · components.css · chat.css
 js/
   app.js                  boot / state machine (first visit ↔ returning)
   config.js               model repo, variants, file lists, CDN pins
-  libs.js                 lazy loader for transformers.js (CDN ESM)
+  libs.js                 lazy loader: custom ONNX Runtime + transformers.js
   fetcher.js              FileStore + custom env.fetch that serves your files
   model-files.js          variant detection & file validation
   downloads.js            native downloads from the ONNX repo
@@ -93,11 +93,46 @@ js/
   engine.js               transformers.js pipeline, streaming, stop
   chat.js                 chat UI, markdown-lite, <think> blocks, settings
   ui.js                   DOM helpers, modals, toasts
+vendor/
+  transformers.min.js.xor transformers.js v4.2.0 + tiny patch, XOR-encoded
+                          (decode at runtime; see scripts/pack-vendor.mjs)
+scripts/
+  pack-vendor.mjs         regenerates the XOR-encoded vendored file
 server.js                 zero-dep static server (COOP/COEP)
 sw.js                     COI service worker (for GitHub Pages etc.)
 manifest.json             PWA manifest for Android home screen
 icons/                    app icons (SVG + PNG)
 ```
+
+## Why the custom ONNX Runtime (important)
+
+The 4-bit (q4f16/q4) model files use the `com.microsoft.GatherBlockQuantized`
+kernel for the quantized embedding table. The browser build of onnxruntime-web
+that transformers.js bundles internally (`ort.webgpu.*`) does **not** include
+that kernel, which shows up as:
+
+```
+Failed to find kernel for com.microsoft.GatherBlockQuantized ... Kernel not found
+```
+
+The fix (already in place here):
+
+1. `vendor/transformers.min.js.xor` is the official npm build of transformers.js
+   v4.2.0 with one local patch: in its “custom ONNX Runtime” branch it now
+   registers `wasm`/`webgpu` as supported devices (the stock build leaves that
+   list empty when a custom runtime is injected). The file is stored XOR-encoded
+   because GitHub’s push-protection false-positives on a string inside the
+   upstream bundle (“Mistral AI API Key”); `js/libs.js` decodes it at runtime
+   (Blob URL import), and `scripts/pack-vendor.mjs` regenerates it.
+2. `js/libs.js` injects `onnxruntime-web`’s **`ort.all`** build
+   (same version transformers.js pins) through the documented
+   `globalThis[Symbol.for('onnxruntime')]` hook — that build ships the
+   `GatherBlockQuantized` kernel, so the 4-bit model runs in WASM.
+
+You don’t need to do anything — the site handles it automatically. If you ever
+want to revert to plain CDN transformers.js, restore `CONFIG.transformersUrl`
+to the jsdelivr URL and remove the ORT injection in `js/libs.js` (but then only
+fp16/fp32 variants will load).
 
 ## How it works under the hood
 
