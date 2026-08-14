@@ -19,7 +19,6 @@ import {
 import { detectVariant, missingFiles, requiredNames } from './model-files.js';
 import { confirmDialog, toast, el, openModal } from './ui.js';
 
-const fileInput = document.getElementById('file-picker');
 const wizardRoot = document.getElementById('wizard-root');
 const chatRoot = document.getElementById('chat-root');
 const headerStatus = document.getElementById('header-status');
@@ -32,6 +31,7 @@ const store = new FileStore();
 let chat = null;        // ChatUI instance
 let currentVariant = CONFIG.defaultVariant;
 let addMode = false;    // next file-pick ADDS to the store instead of replacing it
+let activeFileInput = null; // current (fresh) <input type="file"> element
 
 // ---------------------------------------------------------------- helpers
 
@@ -73,10 +73,38 @@ function showWizardScreen() {
   hideHeaderStatus();
 }
 
+/**
+ * Open the system file manager.
+ *
+ * IMPORTANT: a FRESH <input type="file"> element is created on every call.
+ * Android Chrome has a known bug where reusing the same input element
+ * silently skips the 'change' event on the second pick — which made the
+ * "missing files" screen never update. A new element per pick fixes it.
+ * We also intentionally omit the `accept` attribute, because Android file
+ * pickers often grey out .onnx / .onnx_data files when a filter is present.
+ */
 function openFilePicker(mode) {
   addMode = mode === 'add';
-  fileInput.value = '';
-  fileInput.click();
+
+  if (activeFileInput) {
+    try { activeFileInput.remove(); } catch { /* ignore */ }
+    activeFileInput = null;
+  }
+
+  const input = document.createElement('input');
+  activeFileInput = input;
+  input.type = 'file';
+  input.multiple = true; // no `accept` — see note above
+  input.style.display = 'none';
+  input.addEventListener('change', () => {
+    if (activeFileInput === input) activeFileInput = null;
+    try { input.remove(); } catch { /* ignore */ }
+    if (input.files && input.files.length > 0) {
+      handleFilesSelected(input.files);
+    }
+  });
+  document.body.appendChild(input);
+  input.click();
 }
 
 // ---------------------------------------------------------------- flows
@@ -135,9 +163,18 @@ function handleFilesSelected(fileList) {
 
   if (addMode) {
     // Add mode: keep everything already selected, just merge the new files in.
+    let added = 0;
+    let dupes = 0;
     for (const file of incoming) {
-      if (!store.has(file.name)) store.add(file);
+      if (!store.has(file.name)) {
+        store.add(file);
+        added += 1;
+      } else {
+        dupes += 1;
+      }
     }
+    if (added > 0) toast(`Added ${added} file${added === 1 ? '' : 's'} ✓`, 'ok');
+    else if (dupes > 0) toast('Those files were already in your selection.', '');
   } else {
     store.clear();
     for (const file of incoming) store.add(file);
@@ -230,11 +267,7 @@ async function loadModel(files, dtype) {
 
 // ---------------------------------------------------------------- events
 
-fileInput.addEventListener('change', () => {
-  if (fileInput.files && fileInput.files.length > 0) {
-    handleFilesSelected(fileInput.files);
-  }
-});
+
 
 btnNewChat.addEventListener('click', () => {
   if (!chat) return;
