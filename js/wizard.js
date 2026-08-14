@@ -106,18 +106,69 @@ export function showPickPrompt({ onPick, onDownload, message }) {
   root().append(card);
 }
 
-/** Error screen after a failed load. */
-export function showLoadError({ message, onRetry, onDownload, onBack }) {
+/**
+ * Error screen after a failed load / incomplete selection.
+ * @param {object} opts
+ * @param {string} opts.message
+ * @param {string[]} [opts.found]  files already in the selection
+ * @param {string[]} [opts.missing] files still needed
+ * @param {Function} [opts.onSelectMissing] picks ONLY the missing files (add mode)
+ */
+export function showLoadError({ message, onRetry, onDownload, onBack, onSelectMissing = null, found = [], missing = [] }) {
   clear(root());
+
+  const body = [el('p', { html: message })];
+
+  if (found.length || missing.length) {
+    const summary = el('div', { class: 'selection-summary' }, []);
+    if (found.length) {
+      summary.append(el('div', { class: 'sum-col' }, [
+        el('p', { class: 'sum-title ok', text: `✓ Found (${found.length})` }),
+        el('ul', { class: 'sum-list' }, found.map((n) => el('li', { text: n }))),
+      ]));
+    }
+    if (missing.length) {
+      summary.append(el('div', { class: 'sum-col' }, [
+        el('p', { class: 'sum-title bad', text: `✗ Missing (${missing.length})` }),
+        el('ul', { class: 'sum-list' }, missing.map((n) => el('li', { text: n }))),
+      ]));
+    }
+    body.push(summary);
+  }
+
+  const buttons = [];
+  if (onSelectMissing && missing.length) {
+    buttons.push(
+      el('button', { class: 'btn btn-primary btn-big', type: 'button', onClick: () => onSelectMissing() },
+        `📎 Select these files`),
+    );
+  }
+  if (onRetry) {
+    buttons.push(
+      el('button', { class: 'btn btn-secondary btn-big', type: 'button', onClick: () => onRetry() },
+        '🔁 Pick files again'),
+    );
+  }
+  if (onDownload) {
+    buttons.push(
+      el('button', { class: 'btn btn-secondary btn-big', type: 'button', onClick: () => onDownload() },
+        '⬇️ Download the model'),
+    );
+  }
+  if (onBack) {
+    buttons.push(
+      el('button', { class: 'btn btn-ghost', type: 'button', onClick: () => onBack() }, '← Back'),
+    );
+  }
+  if (onSelectMissing && missing.length) {
+    body.push(el('p', { class: 'small muted' }, '💡 “Select these files” only asks for the missing ones — your current selection is kept, so you don’t have to pick everything again.'));
+  }
+
   const card = el('section', { class: 'card' }, [
     el('p', { class: 'kicker' }, 'Something went wrong'),
     el('h1', { text: 'Could not load the model 😕' }),
-    el('p', { html: message }),
-    el('div', { class: 'btn-row' }, [
-      el('button', { class: 'btn btn-primary btn-big', type: 'button', onClick: () => onRetry() }, '🔁 Pick files again'),
-      el('button', { class: 'btn btn-secondary btn-big', type: 'button', onClick: () => onDownload() }, '⬇️ Download the model'),
-      el('button', { class: 'btn btn-ghost', type: 'button', onClick: () => onBack() }, '← Back'),
-    ]),
+    ...body,
+    el('div', { class: 'btn-row' }, buttons),
   ]);
   root().append(card);
 }

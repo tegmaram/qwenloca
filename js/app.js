@@ -16,7 +16,7 @@ import {
   showWelcome, showAskFiles, showDownload, showLoading, showPickPrompt,
   showLoadError, confirmRedownload, toastError,
 } from './wizard.js';
-import { detectVariant, missingFiles, describeMissing } from './model-files.js';
+import { detectVariant, missingFiles, requiredNames } from './model-files.js';
 import { confirmDialog, toast, el, openModal } from './ui.js';
 
 const fileInput = document.getElementById('file-picker');
@@ -31,6 +31,7 @@ const btnNewChat = document.getElementById('btn-new-chat');
 const store = new FileStore();
 let chat = null;        // ChatUI instance
 let currentVariant = CONFIG.defaultVariant;
+let addMode = false;    // next file-pick ADDS to the store instead of replacing it
 
 // ---------------------------------------------------------------- helpers
 
@@ -72,7 +73,8 @@ function showWizardScreen() {
   hideHeaderStatus();
 }
 
-function openFilePicker() {
+function openFilePicker(mode) {
+  addMode = mode === 'add';
   fileInput.value = '';
   fileInput.click();
 }
@@ -123,14 +125,24 @@ function startDownloadFlow() {
 function startSelectFlow() {
   markVisited();
   showPickPrompt({
-    onPick: () => openFilePicker(),
+    onPick: () => openFilePicker('replace'),
     onDownload: () => startDownloadFlow(),
   });
 }
 
 function handleFilesSelected(fileList) {
-  store.clear();
-  for (const file of Array.from(fileList || [])) store.add(file);
+  const incoming = Array.from(fileList || []);
+
+  if (addMode) {
+    // Add mode: keep everything already selected, just merge the new files in.
+    for (const file of incoming) {
+      if (!store.has(file.name)) store.add(file);
+    }
+  } else {
+    store.clear();
+    for (const file of incoming) store.add(file);
+  }
+  addMode = false;
 
   const variant = detectVariant(store);
   if (!variant) {
@@ -138,10 +150,11 @@ function handleFilesSelected(fileList) {
     showLoadError({
       message:
         'We couldn’t find the model file (<code>decoder_model_merged_….onnx</code>) in your selection. ' +
-        (missing.length
-          ? `You’re also missing:<br>${describeMissing(missing.slice(0, 6))}`
-          : 'Please select all the files you downloaded — the <code>.onnx</code>, <code>.onnx_data</code> and <code>.json</code> files (select multiple at once).'),
-      onRetry: () => openFilePicker(),
+        'Please select all the files you downloaded — the <code>.onnx</code>, <code>.onnx_data</code> and <code>.json</code> files.',
+      found: requiredNames(CONFIG.defaultVariant).filter((n) => store.has(n)),
+      missing,
+      onSelectMissing: missing.length ? () => openFilePicker('add') : null,
+      onRetry: () => openFilePicker('replace'),
       onDownload: () => startDownloadFlow(),
       onBack: () => boot(),
     });
@@ -161,8 +174,13 @@ function handleFilesSelected(fileList) {
   const missing = missingFiles(store, effectiveVariant);
   if (missing.length > 0) {
     showLoadError({
-      message: `Almost there — these files are missing from your selection:<br>${describeMissing(missing)}<br><br>Please select <strong>all</strong> the model files (including the <code>.onnx_data</code> files).`,
-      onRetry: () => openFilePicker(),
+      message:
+        `Almost there — ${missing.length} file${missing.length === 1 ? '' : 's'} still missing from your selection. ` +
+        'Tap <strong>“Select these files”</strong> to add just the missing ones (no need to re-pick everything).',
+      found: requiredNames(effectiveVariant).filter((n) => store.has(n)),
+      missing,
+      onSelectMissing: () => openFilePicker('add'),
+      onRetry: () => openFilePicker('replace'),
       onDownload: () => startDownloadFlow(),
       onBack: () => boot(),
     });
@@ -203,7 +221,7 @@ async function loadModel(files, dtype) {
         : `The model couldn’t start: ${err?.message || err}`;
     showLoadError({
       message: `${msg}<br><br><span class="small muted">Tip: 4-bit (q4f16) is the recommended variant for phones.</span>`,
-      onRetry: () => openFilePicker(),
+      onRetry: () => openFilePicker('replace'),
       onDownload: () => startDownloadFlow(),
       onBack: () => boot(),
     });
